@@ -1,0 +1,81 @@
+org: yakubu
+service: backend-api
+
+stages:
+  default:
+    params:
+      itemTable: "item-table-${sls:stage}"
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  memorySize: 512
+  timeout: 10
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: "*"
+  environment:
+    ITEM_TABLE: ${param:itemTable}
+
+  httpApi:
+    cors: true
+
+functions:
+  createItem:
+    handler: src/item/item.createItem
+    events:
+      - httpApi:
+          path: /items
+          method: post
+  updateItem:
+    handler: src/item/item.updateItem
+    events:
+      - httpApi:
+          path: /items/{itemId}
+          method: patch
+  getItem:
+    handler: src/item/item.getItem
+    events:
+      - httpApi:
+          path: /items/{itemId}
+          method: get
+  deleteItem:
+    handler: src/item/item.deleteItem
+    events:
+      - httpApi:
+          path: /items/{itemId}
+          method: delete
+
+resources:
+  Resources:
+    ItemTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: itemId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: itemId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${param:itemTable}
+
+custom:
+  serverless-dynamodb:
+    stages:
+      - dev
+    start:
+      port: 8000
+      inMemory: true
+
+plugins:
+  - serverless-dynamodb
+  - serverless-offline
